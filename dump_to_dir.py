@@ -13,12 +13,12 @@ YELLOW = '\033[33m'
 PURPLE = '\033[35m'
 RESET = '\033[0m'
 
-USAGE_MESSAGE = """
-Expected Usage:
+USAGE_MESSAGE = f"""
+{GREEN}Expected Usage:{RESET}
     Linux/Mac:
-        ./dump_to_dir.py <target_dir> <source_dir>
+        {YELLOW}./dump_to_dir.py <target_dir> <source_dir>{RESET}
     Windows:
-        python dump_to_dir.py <target_dir> <source_dir>
+        {YELLOW}python dump_to_dir.py <target_dir> <source_dir>{RESET}
 
 This script will move all files from the subdirectories within the source directory
 to the root of the target directory.
@@ -47,6 +47,14 @@ def check_dependencies():
     if force_flag:
         sys.argv.remove('--force')
         print(f"May the gods of YOLO by with you: bypassing virtual environment check.")
+    
+    try:
+        import inquirer
+    except ImportError as e:
+        print(f"{RED}Error{RESET}: A required library is missing: {e.name}")
+        print(f"Please install dependencies using: pip install -r requirements.txt")
+        sys.exit(1)
+    
     if not force_flag and os.getenv('VIRTUAL_ENV') is None:
         print(f"{RED}Warning{RESET}: You are not running in a {GREEN}virtual environment{RESET}.")
         print(f"It is highly recommended to use a {GREEN}virtual environment{RESET} for this script, {PURPLE}modules{RESET} will be checked and installed.\n")
@@ -68,29 +76,66 @@ def check_dependencies():
         print(f"you may force this script with the {YELLOW}--force{RESET} flag.")
         
         sys.exit(1)
-
-        try:
-            import inquirer
-        except ImportError as e:
-            print(f"{RED}Error{RESET}: A required library is missing: {e.name}")
-            print(f"Please install dependencies using: pip install -r requirements.txt")
-            sys.exit(1)
         
-        return inquirer
+    return inquirer
 
 # Run dependency checks:
 inquirer = check_dependencies()
 
-# Check if the target and source directories are provided
+# Check if the target and source directories are provided and valid.
 if len(sys.argv) == 1:
     print(USAGE_MESSAGE)
+    print(f"{YELLOW}No directories provided.{RESET}\nHow would you like to proceed?")
     questions = [
         inquirer.List(
             "default_action",
-            message="No directories provided.\nHow would you like to proceed?",
+            message="",
             choices=[
                 "Use script's location (flatten in place)", "Exit"
             ],
         ),
     ]
     answers = inquirer.prompt(questions)
+
+    if answers["default_action"] == "Exit":
+        print(f"{RED}Exiting...{RESET}")
+        sys.exit(0)
+    else:
+        target_dir = os.path.dirname(os.path.abspath(__file__))
+        source_dir = os.path.dirname(os.path.abspath(__file__))
+
+elif len(sys.argv) == 3:
+    target_dir = sys.argv[1]
+    source_dir = sys.argv[2]
+else:
+    print(f"{USAGE_MESSAGE}")
+    sys.exit(1)
+
+if not os.path.isdir(target_dir):
+    print(f"{RED}Error{RESET}: Target directory does not exist.")
+    sys.exit(1)
+
+if not os.path.isdir(source_dir):
+    print(f"{RED}Error{RESET}: Source directory does not exist.")
+    sys.exit(1)
+
+    target_dir = os.path.abspath(target_dir)
+    source_dir = os.path.abspath(source_dir)
+
+print(f"{GREEN}Source Directory:{RESET} {source_dir}")
+print(f"{GREEN}Target Directory:{RESET} {target_dir}\n")
+print(f"Continue?")
+# Confirm action with the user.
+questions = [
+    inquirer.Confirm(
+        "confirm",
+        message=f"",
+    )
+]
+answers = inquirer.prompt(questions)
+
+if not answers["confirm"]:
+    print(f"{RED}Operation cancelled by user.{RESET}")
+    sys.exit(0)
+
+subdirs = [d for d in os.listdir(source_dir) if os.path.isdir(os.path.join(source_dir, d))]
